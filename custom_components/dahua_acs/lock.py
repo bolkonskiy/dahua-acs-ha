@@ -25,7 +25,8 @@ async def async_setup_entry(
 class DahuaAcsDoorLock(DahuaAcsEntity, LockEntity):
     """Remote open/close for the gate."""
 
-    _attr_translation_key = "door"
+    _attr_has_entity_name = False
+    _attr_name = "Dahua Door"
     _attr_icon = "mdi:door-sliding-lock"
     _attr_unique_id = "dahua_door"
 

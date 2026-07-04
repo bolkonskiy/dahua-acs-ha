@@ -30,7 +30,8 @@ async def async_setup_entry(
 class DahuaAcsDoorStatusSensor(DahuaAcsEntity, SensorEntity):
     """Door status reported by the panel."""
 
-    _attr_translation_key = "door_status"
+    _attr_has_entity_name = False
+    _attr_name = "Dahua Door Status"
     _attr_icon = "mdi:door"
     _attr_unique_id = "dahua_door_status"
 
@@ -43,7 +44,8 @@ class DahuaAcsDoorStatusSensor(DahuaAcsEntity, SensorEntity):
 class DahuaAcsLastEventSensor(DahuaAcsEntity, SensorEntity):
     """Last HTTP push event from the panel."""
 
-    _attr_translation_key = "last_event"
+    _attr_has_entity_name = False
+    _attr_name = "Dahua — последнее HTTP-событие"
     _attr_icon = "mdi:doorbell"
     _attr_unique_id = "dahua_last_http_event"
 
