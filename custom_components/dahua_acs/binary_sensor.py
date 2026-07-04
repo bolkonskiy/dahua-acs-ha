@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
+from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -32,7 +29,6 @@ class DahuaAcsDoorbellBinarySensor(DahuaAcsEntity, BinarySensorEntity):
     """Momentary doorbell press from HTTP events."""
 
     _attr_translation_key = "doorbell"
-    _attr_device_class = BinarySensorDeviceClass.DOORBELL
     _attr_icon = "mdi:doorbell"
     _attr_unique_id = "dahua_doorbell"
 
