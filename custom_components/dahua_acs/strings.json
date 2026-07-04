@@ -1,0 +1,47 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Dahua access panel",
+        "description": "Enter the IP address and credentials of the Dahua ACS panel (e.g. DHI-ASI1212M-W).",
+        "data": {
+          "host": "Host",
+          "username": "Username",
+          "password": "Password",
+          "channel": "Door channel"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the panel.",
+      "invalid_auth": "Authentication failed. Check username and password.",
+      "unknown": "Unexpected error while connecting to the panel."
+    },
+    "abort": {
+      "already_configured": "This panel is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Dahua ACS options",
+        "data": {
+          "scan_interval": "Polling interval (seconds)",
+          "enable_events": "Enable HTTP event webhook"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "door_status": { "name": "Door status" },
+      "last_event": { "name": "Last HTTP event" }
+    },
+    "lock": {
+      "door": { "name": "Door" }
+    },
+    "binary_sensor": {
+      "doorbell": { "name": "Doorbell" }
+    }
+  }
+}

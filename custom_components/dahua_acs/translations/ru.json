@@ -1,0 +1,47 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Подключение панели Dahua",
+        "description": "Укажите IP и учётные данные панели доступа Dahua (например DHI-ASI1212M-W).",
+        "data": {
+          "host": "Хост",
+          "username": "Логин",
+          "password": "Пароль",
+          "channel": "Канал двери"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Не удалось подключиться к панели.",
+      "invalid_auth": "Ошибка авторизации. Проверьте логин и пароль.",
+      "unknown": "Неожиданная ошибка при подключении к панели."
+    },
+    "abort": {
+      "already_configured": "Эта панель уже добавлена."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Параметры Dahua ACS",
+        "data": {
+          "scan_interval": "Интервал опроса (сек)",
+          "enable_events": "Принимать HTTP-события (webhook)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "door_status": { "name": "Статус двери" },
+      "last_event": { "name": "Последнее HTTP-событие" }
+    },
+    "lock": {
+      "door": { "name": "Калитка" }
+    },
+    "binary_sensor": {
+      "doorbell": { "name": "Звонок" }
+    }
+  }
+}
