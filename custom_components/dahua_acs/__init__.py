@@ -15,6 +15,8 @@ from homeassistant.helpers import device_registry as dr
 
 from .api import DahuaAcsApi
 from .const import (
+    ACCESS_CONTROL_PRESS_ACTIONS,
+    ALARM_LOCAL_PRESS_ACTIONS,
     CONF_CHANNEL,
     CONF_ENABLE_EVENTS,
     CONF_WEBHOOK_ID,
@@ -27,6 +29,20 @@ from .coordinator import DahuaAcsCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR, Platform.LOCK, Platform.BINARY_SENSOR]
+
+
+def _is_doorbell_press(payload: dict[str, Any]) -> bool:
+    """True only on doorbell press, not release (AlarmLocal Stop)."""
+    code = str(payload.get("Code", ""))
+    action = str(payload.get("Action", ""))
+    event_data = payload.get("Data") or {}
+    method = event_data.get("Method")
+
+    if code == "AlarmLocal":
+        return action in ALARM_LOCAL_PRESS_ACTIONS
+    if code == "AccessControl" and int(method or 0) == DOORBELL_METHOD:
+        return action in ACCESS_CONTROL_PRESS_ACTIONS
+    return False
 
 
 async def _handle_webhook(
@@ -55,21 +71,22 @@ async def _handle_webhook(
 
     coordinator.handle_webhook_event(payload)
 
-    code = str(payload.get("Code", ""))
-    event_data = payload.get("Data") or {}
-    method = event_data.get("Method")
-    is_doorbell = code == "AlarmLocal" or (
-        code == "AccessControl" and int(method or 0) == DOORBELL_METHOD
-    )
-    if is_doorbell:
+    if _is_doorbell_press(payload):
+        event_data = payload.get("Data") or {}
         hass.bus.async_fire(
             f"{DOMAIN}_doorbell",
             {
                 "device_id": entry_id,
-                "code": code,
-                "method": method,
+                "code": str(payload.get("Code", "")),
+                "method": event_data.get("Method"),
                 "payload": payload,
             },
+        )
+    else:
+        _LOGGER.debug(
+            "Ignored doorbell trigger: code=%s action=%s",
+            payload.get("Code"),
+            payload.get("Action"),
         )
 
     return web.Response(status=200, text="OK")
@@ -91,7 +108,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if entry.options.get(CONF_ENABLE_EVENTS, True):
         webhook_id = entry.data.get(CONF_WEBHOOK_ID, DEFAULT_WEBHOOK_ID)
 
-        async def webhook_handler(request: web.Request) -> web.Response:
+        async def webhook_handler(
+            _hass: HomeAssistant,
+            _webhook_id: str,
+            request: web.Request,
+        ) -> web.Response:
             return await _handle_webhook(hass, entry.entry_id, request)
 
         webhook.async_register(

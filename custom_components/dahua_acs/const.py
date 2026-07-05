@@ -18,3 +18,7 @@ MANUFACTURER = "Dahua"
 MODEL = "DHI-ASI1212M-W"
 
 DOORBELL_METHOD = 12
+
+# AlarmLocal from external button on ALARM IN: Start=pressed, Stop=released.
+ALARM_LOCAL_PRESS_ACTIONS = frozenset({"Start", "Pulse"})
+ACCESS_CONTROL_PRESS_ACTIONS = frozenset({"Pulse", "Start", ""})
