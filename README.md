@@ -14,28 +14,25 @@ All entities are grouped under a single device. Supports HTTP push events (Event
 - Config flow: host, username, password, channel
 - Options: polling interval, enable/disable events
 
-## Installation
+## Installation & updates (HACS)
 
-### HACS (recommended)
+This integration is installed and updated **only through HACS** — do not copy files over SSH or guest-agent scripts; that bypasses HACS version tracking.
 
-1. Add this repository as a [custom repository](https://hacs.xyz/docs/faq/custom_repositories/) (Integration).
-2. Install **Dahua ACS** from HACS.
-3. Restart Home Assistant.
-4. **Settings → Devices & services → Add integration → Dahua ACS**
-5. Enter panel IP (e.g. `192.168.1.80`), username and password.
+### First install
 
-### Manual
+1. **HACS → Integrations → ⋮ → Custom repositories** → add `https://github.com/bolkonskiy/dahua-acs-ha` (category: Integration).
+2. **HACS → Integrations → Dahua ACS → Download**.
+3. **Restart Home Assistant**.
+4. **Settings → Devices & services → Add integration → Dahua ACS** — panel IP, username, password.
 
-Copy `custom_components/dahua_acs` to `config/custom_components/` and restart HA.
+### After code changes (release workflow)
 
-### Deploy from git checkout
+1. Bump `version` in `custom_components/dahua_acs/manifest.json`.
+2. `git commit` + `git push` to `main` on GitHub.
+3. On HA: **HACS → Integrations → Dahua ACS → Update** (pulls latest `main`).
+4. **Restart Home Assistant** (HACS may offer this automatically).
 
-```bash
-chmod +x scripts/deploy_to_ha.sh
-./scripts/deploy_to_ha.sh
-```
-
-Or after `git push`: **HACS → Dahua ACS → Update → Restart**.
+No SSH, no `qm guest exec`, no manual `custom_components` overwrite on the server.
 
 ## Doorbell via ALARM IN (ASI1212)
 
