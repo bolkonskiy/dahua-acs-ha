@@ -29,8 +29,9 @@ This integration is installed and updated **only through HACS** — do not copy 
 
 1. Bump `version` in `custom_components/dahua_acs/manifest.json`.
 2. `git commit` + `git push` to `main` on GitHub.
-3. On HA: **HACS → Integrations → Dahua ACS → Update** (pulls latest `main`).
-4. **Restart Home Assistant** (HACS may offer this automatically).
+3. Create a GitHub Release (tag format: `vX.Y.Z`) from that commit.
+4. On HA: **HACS → Integrations → Dahua ACS → Update** (pulls latest release).
+5. **Restart Home Assistant** (HACS may offer this automatically).
 
 No SSH, no `qm guest exec`, no manual `custom_components` overwrite on the server.
 
