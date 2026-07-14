@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Point Dahua EventHttpUpload to the deflate relay (recommended) or HA webhook.
+# Point Dahua EventHttpUpload to Home Assistant webhook (native, no relay).
 set -euo pipefail
 
 HOST="${DAHUA_ACS_HOST:-192.168.1.80}"
 USER="${DAHUA_ACS_USER:-admin}"
 PASS="${DAHUA_ACS_PASSWORD:-}"
 
-# Relay on LAN host (e.g. Proxmox) — panel cannot POST deflate JSON to HA directly.
-RELAY_HOST="${RELAY_HOST:-192.168.1.10}"
-RELAY_PORT="${RELAY_PORT:-8818}"
-RELAY_PATH="${RELAY_PATH:-/}"
+# HA host receiving /api/webhook/dahua_acs_events
+HA_HOST="${HA_HOST:-192.168.1.11}"
+HA_PORT="${HA_PORT:-8123}"
+HA_PATH="${HA_PATH:-/api/webhook/dahua_acs_events}"
 
 if [[ -z "$PASS" && -f "${DAHUA_SECRETS:-/config/secrets.yaml}" ]]; then
   SECRETS="${DAHUA_SECRETS:-/config/secrets.yaml}"
@@ -36,10 +36,12 @@ curl -s -m 10 "${AUTH[@]}" "${BASE}?action=getConfig&name=EventHttpUpload" | tr 
 echo
 
 set_param "action=setConfig&EventHttpUpload.Enable=true"
-set_param "action=setConfig&EventHttpUpload.UploadServerList[0].Address=${RELAY_HOST}"
-set_param "action=setConfig&EventHttpUpload.UploadServerList[0].Port=${RELAY_PORT}"
-set_param "action=setConfig&EventHttpUpload.UploadServerList[0].Uploadpath=${RELAY_PATH}"
+set_param "action=setConfig&EventHttpUpload.UploadServerList[0].Address=${HA_HOST}"
+set_param "action=setConfig&EventHttpUpload.UploadServerList[0].Port=${HA_PORT}"
+set_param "action=setConfig&EventHttpUpload.UploadServerList[0].Uploadpath=${HA_PATH}"
 set_param "action=setConfig&EventHttpUpload.UploadServerList[0].EventType[0]=AccessControl&EventHttpUpload.UploadServerList[0].EventType[1]=AlarmLocal"
 
 echo "After:"
 curl -s -m 10 "${AUTH[@]}" "${BASE}?action=getConfig&name=EventHttpUpload" | tr '\r' '\n'
+echo
+echo "Panel will POST to http://${HA_HOST}:${HA_PORT}${HA_PATH}"

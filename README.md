@@ -2,7 +2,7 @@
 
 Custom integration for **Dahua access control panels** (e.g. **DHI-ASI1212M-W**) over LAN HTTP API with Digest authentication.
 
-All entities are grouped under a single device. Supports HTTP push events (EventHttpUpload) via webhook.
+All entities are grouped under a single device. Supports HTTP push events (**EventHttpUpload**) via the native HA webhook — including Dahua `Content-Encoding: deflate` bodies.
 
 ## Features
 
@@ -10,7 +10,7 @@ All entities are grouped under a single device. Supports HTTP push events (Event
 - **Sensor** — door status (`Open`, `Close`, `Break`)
 - **Sensor** — last HTTP event from the panel
 - **Binary sensor** — doorbell pulse on **press only** (`AlarmLocal` `Start` or `AccessControl` method=12)
-- **Webhook** — `/api/webhook/dahua_acs_events`
+- **Webhook** — `/api/webhook/dahua_acs_events` (deflate/gzip decode + text→JSON parse inside the integration)
 - Config flow: host, username, password, channel
 - Options: polling interval, enable/disable events
 
@@ -46,33 +46,24 @@ Wire the external button to **ALARM_1 + GND** (NO) and use `AlarmLocal` HTTP pus
    DAHUA_ACS_PASSWORD=... ./scripts/configure_alarm_doorbell.sh
    ```
 
-2. **Deflate relay** on a LAN host (Proxmox, NAS, etc.):
+2. **EventHttpUpload** on the panel → Home Assistant webhook (no external relay):
 
    ```bash
-   sudo cp scripts/dahua_event_relay.py /usr/local/bin/
-   sudo cp systemd/dahua-event-relay.service /etc/systemd/system/
-   sudo systemctl enable --now dahua-event-relay
+   DAHUA_ACS_PASSWORD=... HA_HOST=192.168.1.11 ./scripts/dahua_enable_http_upload.sh
    ```
 
-3. **EventHttpUpload** on the panel → relay:
+   This configures the panel to POST to:
 
-   ```bash
-   DAHUA_ACS_PASSWORD=... RELAY_HOST=192.168.1.10 ./scripts/dahua_enable_http_upload.sh
+   ```text
+   http://192.168.1.11:8123/api/webhook/dahua_acs_events
    ```
-
-4. Relay forwards JSON to HA webhook (registered by this integration).
 
 The integration fires `binary_sensor.*_doorbell` only on **press** (`AlarmLocal` `Action=Start`), not on release (`Stop`).
 
-## Panel HTTP events
+### Migration from deflate relay
 
-Configure **EventHttpUpload** to POST to the relay (port **8818**), not directly to HA — ASI1212 sends `Content-Encoding: deflate` bodies.
-
-HA webhook URL (used by relay):
-
-```text
-http://<ha-host>:8123/api/webhook/dahua_acs_events
-```
+Older setups used a LAN `dahua-event-relay` on port **8818** because HA did not unpack Dahua deflate.  
+From **v1.2.0** the integration handles deflate natively — point EventHttpUpload at HA and remove the relay service.
 
 ## Entities
 

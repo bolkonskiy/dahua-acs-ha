@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -25,6 +24,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import DahuaAcsCoordinator
+from .webhook_payload import parse_webhook_body
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,24 +50,21 @@ async def _handle_webhook(
     entry_id: str,
     request: web.Request,
 ) -> web.Response:
-    """Handle EventHttpUpload POST from the panel."""
+    """Handle EventHttpUpload POST from the panel (native, incl. deflate)."""
     coordinator: DahuaAcsCoordinator = hass.data[DOMAIN][entry_id]
 
-    payload: dict[str, Any]
-    content_type = request.headers.get("Content-Type", "")
-    if "json" in content_type:
-        try:
-            payload = await request.json()
-        except json.JSONDecodeError:
-            payload = {"raw": (await request.text())[:500]}
-    else:
-        text = await request.text()
-        payload = {"raw": text[:500]}
-        if text.strip().startswith("{"):
-            try:
-                payload = json.loads(text)
-            except json.JSONDecodeError:
-                pass
+    raw = await request.read()
+    payload = parse_webhook_body(
+        raw,
+        content_encoding=request.headers.get("Content-Encoding"),
+        content_type=request.headers.get("Content-Type", ""),
+    )
+    _LOGGER.debug(
+        "Dahua webhook: encoding=%s len=%s payload=%s",
+        request.headers.get("Content-Encoding"),
+        len(raw),
+        {k: payload.get(k) for k in ("Code", "Action", "Data") if k in payload},
+    )
 
     coordinator.handle_webhook_event(payload)
 
