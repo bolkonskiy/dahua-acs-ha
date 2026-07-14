@@ -2,7 +2,9 @@
 
 Custom integration for **Dahua access control panels** (e.g. **DHI-ASI1212M-W**) over LAN HTTP API with Digest authentication.
 
-All entities are grouped under a single device. Supports HTTP push events (**EventHttpUpload**) via the native HA webhook — including Dahua `Content-Encoding: deflate` bodies.
+All entities are grouped under a single device. Doorbell / panel events come via a **native DHIP TCP event stream** (panel port **5000**) — Home Assistant connects outbound and receives `AlarmLocal` / `AccessControl` pushes. No Proxmox relay required.
+
+EventHttpUpload webhooks remain as an optional fallback; aiohttp often rejects Dahua’s non-standard `Content-Encoding: deflate`, so DHIP is the reliable path.
 
 ## Features
 
@@ -10,7 +12,8 @@ All entities are grouped under a single device. Supports HTTP push events (**Eve
 - **Sensor** — door status (`Open`, `Close`, `Break`)
 - **Sensor** — last HTTP event from the panel
 - **Binary sensor** — doorbell pulse on **press only** (`AlarmLocal` `Start` or `AccessControl` method=12)
-- **Webhook** — `/api/webhook/dahua_acs_events` (deflate/gzip decode + text→JSON parse inside the integration)
+- **DHIP events** — TCP `:5000` `eventManager.attach` (primary)
+- **Webhook** — `/api/webhook/dahua_acs_events` (optional fallback)
 - Config flow: host, username, password, channel
 - Options: polling interval, enable/disable events
 
@@ -46,24 +49,17 @@ Wire the external button to **ALARM_1 + GND** (NO) and use `AlarmLocal` HTTP pus
    DAHUA_ACS_PASSWORD=... ./scripts/configure_alarm_doorbell.sh
    ```
 
-2. **EventHttpUpload** on the panel → Home Assistant webhook (no external relay):
+2. Ensure the panel allows **TCP 5000** from the HA host (LAN). The integration attaches to `eventManager` automatically after setup.
 
-   ```bash
-   DAHUA_ACS_PASSWORD=... HA_HOST=192.168.1.11 ./scripts/dahua_enable_http_upload.sh
-   ```
-
-   This configures the panel to POST to:
-
-   ```text
-   http://192.168.1.11:8123/api/webhook/dahua_acs_events
-   ```
+3. (Optional) EventHttpUpload / webhook is not required for the doorbell.
 
 The integration fires `binary_sensor.*_doorbell` only on **press** (`AlarmLocal` `Action=Start`), not on release (`Stop`).
 
-### Migration from deflate relay
+### Migration from deflate relay / broken webhook
 
-Older setups used a LAN `dahua-event-relay` on port **8818** because HA did not unpack Dahua deflate.  
-From **v1.2.0** the integration handles deflate natively — point EventHttpUpload at HA and remove the relay service.
+Older setups used a LAN `dahua-event-relay` on port **8818**, then direct EventHttpUpload to HA.  
+Dahua’s deflate bodies still break aiohttp on Home Assistant Core.  
+From **v1.3.0** use **DHIP** (built-in) and remove any relay.
 
 ## Entities
 

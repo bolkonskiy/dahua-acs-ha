@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -24,6 +25,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import DahuaAcsCoordinator
+from .dhip import run_dhip_listener
 from .webhook_payload import parse_webhook_body
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,27 +47,13 @@ def _is_doorbell_press(payload: dict[str, Any]) -> bool:
     return False
 
 
-async def _handle_webhook(
+def _dispatch_panel_event(
     hass: HomeAssistant,
     entry_id: str,
-    request: web.Request,
-) -> web.Response:
-    """Handle EventHttpUpload POST from the panel (native, incl. deflate)."""
+    payload: dict[str, Any],
+) -> None:
+    """Update coordinator + fire doorbell bus event when applicable."""
     coordinator: DahuaAcsCoordinator = hass.data[DOMAIN][entry_id]
-
-    raw = await request.read()
-    payload = parse_webhook_body(
-        raw,
-        content_encoding=request.headers.get("Content-Encoding"),
-        content_type=request.headers.get("Content-Type", ""),
-    )
-    _LOGGER.debug(
-        "Dahua webhook: encoding=%s len=%s payload=%s",
-        request.headers.get("Content-Encoding"),
-        len(raw),
-        {k: payload.get(k) for k in ("Code", "Action", "Data") if k in payload},
-    )
-
     coordinator.handle_webhook_event(payload)
 
     if _is_doorbell_press(payload):
@@ -79,13 +67,51 @@ async def _handle_webhook(
                 "payload": payload,
             },
         )
+        _LOGGER.info(
+            "Doorbell press: code=%s action=%s",
+            payload.get("Code"),
+            payload.get("Action"),
+        )
     else:
         _LOGGER.debug(
-            "Ignored doorbell trigger: code=%s action=%s",
+            "Panel event (no doorbell pulse): code=%s action=%s",
             payload.get("Code"),
             payload.get("Action"),
         )
 
+
+async def _handle_webhook(
+    hass: HomeAssistant,
+    entry_id: str,
+    request: web.Request,
+) -> web.Response:
+    """Handle EventHttpUpload POST (best-effort).
+
+    Dahua's Content-Encoding: deflate is not standard — aiohttp often raises
+    before the body is readable. Prefer DHIP for doorbell; keep webhook for
+    panels that send plain/JSON bodies.
+    """
+    try:
+        raw = await request.read()
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.warning(
+            "Dahua webhook body unreadable (use DHIP for doorbell): %s",
+            err,
+        )
+        return web.Response(status=200, text="OK")
+
+    payload = parse_webhook_body(
+        raw,
+        content_encoding=request.headers.get("Content-Encoding"),
+        content_type=request.headers.get("Content-Type", ""),
+    )
+    _LOGGER.debug(
+        "Dahua webhook: encoding=%s len=%s payload=%s",
+        request.headers.get("Content-Encoding"),
+        len(raw),
+        {k: payload.get(k) for k in ("Code", "Action", "Data") if k in payload},
+    )
+    _dispatch_panel_event(hass, entry_id, payload)
     return web.Response(status=200, text="OK")
 
 
@@ -124,6 +150,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.async_on_unload(
             lambda: webhook.async_unregister(hass, webhook_id)
         )
+
+        # Native events: DHIP TCP subscribe (port 5000)
+        stop_event = asyncio.Event()
+        entry_id = entry.entry_id
+
+        async def _on_dhip_event(event: dict[str, Any]) -> None:
+            _dispatch_panel_event(hass, entry_id, event)
+
+        task = hass.async_create_background_task(
+            run_dhip_listener(
+                entry.data[CONF_HOST],
+                entry.data[CONF_USERNAME],
+                entry.data[CONF_PASSWORD],
+                _on_dhip_event,
+                port=5000,
+                stop_event=stop_event,
+            ),
+            name=f"{DOMAIN}_dhip_{entry_id}",
+        )
+
+        def _stop_dhip() -> None:
+            stop_event.set()
+            task.cancel()
+
+        entry.async_on_unload(_stop_dhip)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
