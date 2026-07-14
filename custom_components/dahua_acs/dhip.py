@@ -188,7 +188,7 @@ class DahuaDhipClient(asyncio.Protocol):
                     5, int(params["keepAliveInterval"]) - 5
                 )
             self.session_id = message.get("session", self.session_id)
-            _LOGGER.info("DHIP login OK host session=%s", self.session_id)
+            _LOGGER.warning("DHIP login OK host session=%s", self.session_id)
             self.attach_events()
             if self.on_ready and not self.on_ready.done():
                 self.on_ready.set_result(True)
@@ -214,7 +214,7 @@ class DahuaDhipClient(asyncio.Protocol):
             if message.get("error"):
                 _LOGGER.error("DHIP attach error: %s", message["error"])
             else:
-                _LOGGER.info("DHIP event stream attached")
+                _LOGGER.warning("DHIP event stream attached")
 
         self.send(
             DAHUA_EVENT_MANAGER_ATTACH,
@@ -273,7 +273,7 @@ async def run_dhip_listener(
             )
             await asyncio.wait_for(ready, timeout=20)
             backoff = 2.0
-            _LOGGER.info("DHIP listening on %s:%s", host, port)
+            _LOGGER.warning("DHIP listening on %s:%s", host, port)
             await stop_event.wait()
         except asyncio.CancelledError:
             raise

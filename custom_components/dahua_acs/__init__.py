@@ -35,12 +35,14 @@ PLATFORMS = [Platform.SENSOR, Platform.LOCK, Platform.BINARY_SENSOR]
 
 def _is_doorbell_press(payload: dict[str, Any]) -> bool:
     """True only on doorbell press, not release (AlarmLocal Stop)."""
-    code = str(payload.get("Code", ""))
+    code = str(payload.get("Code", "")).strip()
     action = str(payload.get("Action", ""))
     event_data = payload.get("Data") or {}
     method = event_data.get("Method")
 
-    if code == "AlarmLocal":
+    # Panel sometimes emits `_AlarmLocal_` instead of `AlarmLocal`
+    code_norm = code.strip("_")
+    if code_norm == "AlarmLocal" or code == "AlarmLocal":
         return action in ALARM_LOCAL_PRESS_ACTIONS
     if code == "AccessControl" and int(method or 0) == DOORBELL_METHOD:
         return action in ACCESS_CONTROL_PRESS_ACTIONS
@@ -67,7 +69,7 @@ def _dispatch_panel_event(
                 "payload": payload,
             },
         )
-        _LOGGER.info(
+        _LOGGER.warning(
             "Doorbell press: code=%s action=%s",
             payload.get("Code"),
             payload.get("Action"),
@@ -158,15 +160,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         async def _on_dhip_event(event: dict[str, Any]) -> None:
             _dispatch_panel_event(hass, entry_id, event)
 
-        task = hass.async_create_background_task(
-            run_dhip_listener(
+        async def _dhip_runner() -> None:
+            _LOGGER.warning(
+                "Starting DHIP listener for %s:5000",
+                entry.data[CONF_HOST],
+            )
+            await run_dhip_listener(
                 entry.data[CONF_HOST],
                 entry.data[CONF_USERNAME],
                 entry.data[CONF_PASSWORD],
                 _on_dhip_event,
                 port=5000,
                 stop_event=stop_event,
-            ),
+            )
+
+        task = hass.async_create_background_task(
+            _dhip_runner(),
             name=f"{DOMAIN}_dhip_{entry_id}",
         )
 
