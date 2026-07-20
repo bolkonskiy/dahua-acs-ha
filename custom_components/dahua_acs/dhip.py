@@ -61,12 +61,14 @@ class DahuaDhipClient(asyncio.Protocol):
         loop: asyncio.AbstractEventLoop,
         on_event: EventCallback,
         on_ready: asyncio.Future[bool] | None = None,
+        on_disconnect: asyncio.Event | None = None,
     ) -> None:
         self.username = username
         self.password = password
         self.loop = loop
         self.on_event = on_event
         self.on_ready = on_ready
+        self.on_disconnect = on_disconnect
         self.transport: asyncio.Transport | None = None
         self.buffer = bytearray()
         self.request_id = 0
@@ -90,6 +92,8 @@ class DahuaDhipClient(asyncio.Protocol):
             self.on_ready.set_exception(
                 ConnectionError(f"DHIP disconnected before ready: {exc}")
             )
+        if self.on_disconnect and not self.on_disconnect.is_set():
+            self.on_disconnect.set()
 
     def data_received(self, data: bytes) -> None:
         self.buffer += data
@@ -265,7 +269,15 @@ async def run_dhip_listener(
     backoff = 2.0
     while not stop_event.is_set():
         ready: asyncio.Future[bool] = loop.create_future()
-        client = DahuaDhipClient(username, password, loop, on_event, ready)
+        disconnected = asyncio.Event()
+        client = DahuaDhipClient(
+            username,
+            password,
+            loop,
+            on_event,
+            ready,
+            on_disconnect=disconnected,
+        )
         transport = None
         try:
             transport, _proto = await loop.create_connection(
@@ -274,7 +286,18 @@ async def run_dhip_listener(
             await asyncio.wait_for(ready, timeout=20)
             backoff = 2.0
             _LOGGER.warning("DHIP listening on %s:%s", host, port)
-            await stop_event.wait()
+
+            stop_task = asyncio.create_task(stop_event.wait())
+            disc_task = asyncio.create_task(disconnected.wait())
+            done, pending = await asyncio.wait(
+                {stop_task, disc_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+            if stop_event.is_set():
+                break
+            _LOGGER.warning("DHIP session dropped; reconnecting")
         except asyncio.CancelledError:
             raise
         except Exception as err:  # noqa: BLE001
